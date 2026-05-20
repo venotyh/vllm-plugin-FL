@@ -462,8 +462,9 @@ class AttentionFLImpl(AttentionImpl):
         self.batch_invariant_enabled = _bi_mode
 
         if is_quantized_kv_cache(self.kv_cache_dtype):
-            raise NotImplementedError(
-                "AttentionFL does not support quantization kv-cache on this device."
+            logger.warning(
+                "FP8 KV cache detected (%s): will dequantize to bf16 before attention.",
+                self.kv_cache_dtype,
             )
         ### TODO(lms): support quant to int8/int4 each query input and low precision compute
         self.supports_quant_query_input = False
@@ -534,6 +535,14 @@ class AttentionFLImpl(AttentionImpl):
 
         # For decoder and cross-attention, use KV cache as before
         key_cache, value_cache = kv_cache.unbind(0)
+
+        if is_quantized_kv_cache(self.kv_cache_dtype):
+            print(
+                f"[FP8 DEBUG] _k_scale shape={layer._k_scale.shape} "
+                f"dtype={layer._k_scale.dtype} | "
+                f"key_cache shape={key_cache.shape} dtype={key_cache.dtype}",
+                flush=True,
+            )
 
         # key and value may be None in the case of cross attention. They are
         # calculated once based on the output from the encoder and then cached
