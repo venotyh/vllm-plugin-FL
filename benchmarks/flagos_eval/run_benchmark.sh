@@ -45,6 +45,7 @@ for scenario in "${!THROUGHPUT_SCENARIOS[@]}"; do
         --num-prompts "${num_prompts}" \
         --trust-remote-code \
         --dtype auto \
+        --kv-cache-dtype fp8_e4m3 \
 		--enforce-eager \
         --output-json "${output_file}"
 
@@ -72,6 +73,7 @@ for scenario in "${!LATENCY_SCENARIOS[@]}"; do
         --num-iters "${num_iters}" \
         --trust-remote-code \
         --dtype auto \
+        --kv-cache-dtype fp8_e4m3 \
 		--enforce-eager \
         --output-json "${output_file}"
 
