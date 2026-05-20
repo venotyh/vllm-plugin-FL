@@ -49,7 +49,6 @@ flagos_blacklist:
   - to_copy
   - cat
   - index
-  - mul
   - pow_scalar
 
 # OOT (Out-of-Tree) operator blacklist
