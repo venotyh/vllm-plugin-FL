@@ -96,10 +96,11 @@ class AttentionFLBackend(AttentionBackend):
     def supports_sink(cls) -> bool:
         return False
 
-    ### TODO(lms): support int8/int4 kv cache
     @classmethod
     def supports_kv_cache_dtype(cls, kv_cache_dtype: CacheDType | None) -> bool:
         if kv_cache_dtype is None:
+            return True
+        if isinstance(kv_cache_dtype, str) and kv_cache_dtype.startswith("fp8"):
             return True
         return kv_cache_dtype in ["auto"]
     @staticmethod
@@ -536,14 +537,6 @@ class AttentionFLImpl(AttentionImpl):
         # For decoder and cross-attention, use KV cache as before
         key_cache, value_cache = kv_cache.unbind(0)
 
-        if is_quantized_kv_cache(self.kv_cache_dtype):
-            print(
-                f"[FP8 DEBUG] _k_scale shape={layer._k_scale.shape} "
-                f"dtype={layer._k_scale.dtype} | "
-                f"key_cache shape={key_cache.shape} dtype={key_cache.dtype}",
-                flush=True,
-            )
-
         # key and value may be None in the case of cross attention. They are
         # calculated once based on the output from the encoder and then cached
         # in KV cache.
@@ -569,6 +562,12 @@ class AttentionFLImpl(AttentionImpl):
                 layer._k_scale,
                 layer._v_scale,
             )
+
+        # FP8 KV cache: dequantize to bf16 after writing new tokens to cache,
+        # before attention compute. _k_scale/_v_scale are per-tensor scalars.
+        if is_quantized_kv_cache(self.kv_cache_dtype):
+            key_cache = key_cache.to(torch.bfloat16) * layer._k_scale
+            value_cache = value_cache.to(torch.bfloat16) * layer._v_scale
 
         if not attn_metadata.use_cascade:
             cu_seqlens_q = attn_metadata.query_start_loc
